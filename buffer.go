@@ -68,6 +68,12 @@ func (b *Buffer) Flush() {
 	b.mu.Unlock()
 }
 
+func (b *Buffer) WriteOnce(s []byte) {
+	b.Start()
+	b.v = append(b.v, s...)
+	b.End()
+}
+
 type BufferOption func(*Buffer)
 
 func IgnoreTrailingByte() BufferOption {

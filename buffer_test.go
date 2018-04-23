@@ -26,9 +26,7 @@ func TestBuffer(t *testing.T) {
 	a.Equal(hello, out.Bytes(), "force flush")
 	out.Reset()
 
-	buf.Start()
-	buf.Write(hello)
-	buf.End()
+	buf.WriteOnce(hello)
 
 	buf.Start()
 	buf.AppendByte(' ')
