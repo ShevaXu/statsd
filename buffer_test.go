@@ -8,45 +8,55 @@ import (
 	"github.com/ShevaXu/statsd"
 )
 
+var (
+	hello = []byte("hello")
+	world = []byte("world")
+)
+
 func TestBuffer(t *testing.T) {
 	a := assert.NewAssert(t)
 	var out bytes.Buffer
 	buf := statsd.NewBuffer(10, 5, &out)
-	str := []byte("hello world")
 
-	buf.Write(str)
-	a.True(buf.IsFull(), "is full")
-	buf.Flush(0)
-	a.Equal(str, out.Bytes(), "flush all")
-	a.True(buf.IsEmpty(), "is empty")
+	buf.Start()
+	buf.Write(hello)
+	buf.End()
 
+	buf.Flush()
+	a.Equal(hello, out.Bytes(), "force flush")
 	out.Reset()
-	buf.Flush(0)
-	a.Equal(0, len(out.Bytes()), "flush nothing if empty")
 
-	buf.Write(str)
-	buf.Flush(6)
-	a.Equal(str[:6], out.Bytes(), "partial flush")
+	buf.Start()
+	buf.Write(hello)
+	buf.End()
 
+	buf.Start()
+	buf.AppendByte(' ')
+	buf.Write(world)
+	buf.End()
+	a.Equal(hello, out.Bytes(), "auto flush")
 	out.Reset()
-	buf.Flush(0)
-	a.Equal(str[6:], out.Bytes(), "flush the rest")
 
-	for _, c := range str {
-		buf.WriteByte(c)
-	}
+	buf.Flush()
+	a.Equal(" world", out.String(), "flush the rest")
 	out.Reset()
-	buf.Flush(0)
-	a.Equal(str, out.Bytes(), "flush all byte by byte")
+
+	buf.Flush()
+	a.Equal(0, len(out.Bytes()), "flush when empty")
 }
 
 func TestBufferIgnoreTrailingByte(t *testing.T) {
 	a := assert.NewAssert(t)
 	var out bytes.Buffer
 	buf := statsd.NewBuffer(10, 5, &out, statsd.IgnoreTrailingByte())
-	str := []byte("hello world\n")
 
-	buf.Write(str)
-	buf.Flush(0)
-	a.Equal(str[:len(str)-1], out.Bytes(), "flush all but last byte")
+	buf.Start()
+	buf.Write(hello)
+	buf.AppendByte(' ')
+	buf.End()
+
+	buf.Start()
+	buf.Write(world)
+	buf.End()
+	a.Equal(hello, out.Bytes(), "flush without trailing byte")
 }
