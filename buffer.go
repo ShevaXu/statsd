@@ -6,6 +6,10 @@ import (
 	"sync"
 )
 
+// A Flusher is an alias for *buffer; it can be refactored to an
+// interface later if needed.
+type Flusher = *Buffer
+
 // A Buffer is a (supposedly) fix-sized Buffer of bytes with auto
 // out-of-capacity flushing (to a io.Writer), mainly used for sending
 // multiple messages to the same destination. The zero value for
