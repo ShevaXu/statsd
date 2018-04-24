@@ -2,6 +2,7 @@ package statsd
 
 import (
 	"io"
+	"strconv"
 	"sync"
 )
 
@@ -23,8 +24,20 @@ func (b *Buffer) Write(s []byte) {
 	b.v = append(b.v, s...)
 }
 
+func (b *Buffer) WriteString(s string) {
+	b.v = append(b.v, s...)
+}
+
 func (b *Buffer) AppendByte(c byte) {
 	b.v = append(b.v, c)
+}
+
+func (b *Buffer) AppendInt(i int64) {
+	b.v = strconv.AppendInt(b.v, i, 10)
+}
+
+func (b *Buffer) AppendFloat(f float64) {
+	b.v = strconv.AppendFloat(b.v, f, 'f', -1, 64)
 }
 
 func (b *Buffer) flush(l int) {
@@ -69,6 +82,12 @@ func (b *Buffer) Flush() {
 }
 
 func (b *Buffer) WriteOnce(s []byte) {
+	b.Start()
+	b.v = append(b.v, s...)
+	b.End()
+}
+
+func (b *Buffer) WriteStringOnce(s string) {
 	b.Start()
 	b.v = append(b.v, s...)
 	b.End()
