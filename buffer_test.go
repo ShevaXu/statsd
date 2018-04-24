@@ -58,3 +58,14 @@ func TestBufferIgnoreTrailingByte(t *testing.T) {
 	buf.End()
 	a.Equal(hello, out.Bytes(), "flush without trailing byte")
 }
+
+func TestZeroBuffer(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log(r)
+		}
+	}()
+	var buf statsd.Buffer
+	buf.Write(hello)
+	buf.Flush() // nil io.Writer
+}
