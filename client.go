@@ -11,12 +11,16 @@ import (
 type Client struct {
 	buf    Flusher
 	c      *config
+	closed bool
 	mu     sync.Mutex
 	ticker *time.Ticker
 }
 
 // metric appends bytes to the buffer according to the StatsD protocal.
 func (c *Client) metric(bucket string, v int64, typ byte) {
+	if c.closed {
+		return
+	}
 	c.buf.Start()
 	c.buf.WriteString(bucket)
 	c.buf.AppendByte(':')
@@ -42,6 +46,9 @@ func (c *Client) Counting(bucket string, v int64) {
 // Timing records a event timing in millisecond.
 func (c *Client) Timing(bucket string, v int64) {
 	// bucket:3600|ms
+	if c.closed {
+		return
+	}
 	c.buf.Start()
 	c.buf.WriteString(bucket)
 	c.buf.AppendByte(':')
@@ -55,7 +62,7 @@ func (c *Client) Timing(bucket string, v int64) {
 // It allows hot-paths to send less often.
 func (c *Client) Sampling(bucket string, rate float64) {
 	// bucket:1|c|@0.1
-	if rand.Float64() > rate {
+	if c.closed || rand.Float64() > rate {
 		return
 	}
 	c.buf.Start()
@@ -70,7 +77,7 @@ func (c *Client) Sampling(bucket string, rate float64) {
 // It override is set to true, this call will stop previous one
 // and start a new one.
 func (c *Client) AutoFlush(period time.Duration, override bool) {
-	if period > 0 {
+	if period > 0 && !c.closed {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if c.ticker != nil {
@@ -89,6 +96,12 @@ func (c *Client) AutoFlush(period time.Duration, override bool) {
 			}
 		}()
 	}
+}
+
+// Close closes the client and releases the resources.
+func (c *Client) Close() {
+	c.closed = true
+	c.ticker.Stop()
 }
 
 // Packet size guildlines
@@ -132,5 +145,6 @@ func NewClient(addr string, opts ...Option) (*Client, error) {
 	}
 	return &Client{
 		buf: NewBuffer(c.maxPacketSize, 256, conn, IgnoreTrailingByte()),
+		c:   c,
 	}, nil
 }
