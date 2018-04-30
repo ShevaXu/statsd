@@ -8,6 +8,7 @@ import (
 // A Client is a StatsD client. It can be used by multiple goroutines.
 type Client struct {
 	buf Flusher
+	c   *config
 }
 
 // metric appends bytes to the buffer according to the StatsD protocal.
@@ -61,12 +62,46 @@ func (c *Client) Sampling(bucket string, rate float64) {
 	c.buf.End()
 }
 
-func NewClient(addr string) (*Client, error) {
+// Packet size guildlines
+// (from https://github.com/etsy/statsd/blob/master/docs/metric_types.md)
+const (
+	// These payload numbers take into account the maximum IP + UDP header sizes.
+	PacketSizeFastEthernet      = 1432 // This is most likely for Intranets.
+	PacketSizeGigabitEthernet   = 8932 // Jumbo frames can make use of this feature much more efficient.
+	PacketSizeCommodityInternet = 512  // If you are routing over the internet ... (default)
+)
+
+// A config is the client's configurable options.
+type config struct {
+	addr          string
+	maxPacketSize int
+}
+
+// An Option represents an option to change the default behaviours of
+// the client, used as an argument to NewClient().
+type Option func(*config)
+
+// PacketSize sets the maximum bytes sent by the Client at a time.
+func PacketSize(n int) Option {
+	return func(c *config) {
+		c.maxPacketSize = n
+	}
+}
+
+// NewClient returns a new Client.
+func NewClient(addr string, opts ...Option) (*Client, error) {
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		return nil, err
 	}
+	c := &config{
+		addr:          addr,
+		maxPacketSize: PacketSizeCommodityInternet,
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
 	return &Client{
-		buf: NewBuffer(1440, 200, conn, IgnoreTrailingByte()),
+		buf: NewBuffer(c.maxPacketSize, 256, conn, IgnoreTrailingByte()),
 	}, nil
 }
