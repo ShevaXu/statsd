@@ -23,19 +23,20 @@ const (
 
 func BenchmarkStatsd(b *testing.B) {
 	s := newServer()
-	c, err := statsd.NewClient(s.LocalAddr().String())
+	c, err := statsd.NewClient(s.LocalAddr().String(), statsd.PacketSize(statsd.PacketSizeFastEthernet))
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 
+	c.AutoFlush(flushPeriod, true)
 	for i := 0; i < b.N; i++ {
-		c.Counting(counterKey, 1)
-		c.Gauge(gaugeKey, gaugeValue)
-		c.Timing(timingKey, int64(timingValue))
+		c.Counting(prefix+counterKey, 1)
+		c.Gauge(prefix+gaugeKey, gaugeValue)
+		c.Timing(prefix+timingKey, int64(timingValue))
 	}
-	// c.Close()
+	c.Close()
 	s.Close()
 }
 
