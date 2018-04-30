@@ -3,12 +3,16 @@ package statsd
 import (
 	"math/rand"
 	"net"
+	"sync"
+	"time"
 )
 
 // A Client is a StatsD client. It can be used by multiple goroutines.
 type Client struct {
-	buf Flusher
-	c   *config
+	buf    Flusher
+	c      *config
+	mu     sync.Mutex
+	ticker *time.Ticker
 }
 
 // metric appends bytes to the buffer according to the StatsD protocal.
@@ -60,6 +64,31 @@ func (c *Client) Sampling(bucket string, rate float64) {
 	c.buf.AppendFloat(rate)
 	c.buf.AppendByte('\n')
 	c.buf.End()
+}
+
+// AutoFlush sets the client to flush the buffer every period.
+// It override is set to true, this call will stop previous one
+// and start a new one.
+func (c *Client) AutoFlush(period time.Duration, override bool) {
+	if period > 0 {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.ticker != nil {
+			if !override {
+				return
+			}
+			// stop the original ticker
+			c.ticker.Stop()
+		}
+		// new ticker
+		c.ticker = time.NewTicker(period)
+		// do not block
+		go func() {
+			for _ = range c.ticker.C {
+				c.buf.Flush()
+			}
+		}()
+	}
 }
 
 // Packet size guildlines
